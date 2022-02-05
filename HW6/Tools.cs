@@ -10,14 +10,42 @@ using System.Data;
 // using System.Data.OleDb;
 using System.Globalization;
 using System.Linq;
-using System.Text; 
+using System.Text;
 // DateTime.Now;
 using System.Collections;
 
 // See https://aka.ms/new-console-template for more information
-namespace   MyApp // Note: actual namespace depends on the project name.
+namespace MyApp // Note: actual namespace depends on the project name.
 {
-    internal class Tools
+    internal class NewBaseType
+    {
+        public static bool Jabbed(string producent, string dawka_ost)
+        {
+            // string alias System.String  
+            // int    alias System.Int32 
+
+            producent = producent.Trim();
+            dawka_ost = dawka_ost.Trim();
+
+            if (producent.ToLower().Contains("brak danych"))
+            {
+
+                producent = "";
+
+            }
+
+            if (dawka_ost.ToLower().Contains("brak danych"))
+            {
+
+                dawka_ost = "";
+
+            }
+
+            return String.Concat(producent, dawka_ost).Length > 0;
+        }
+    }
+
+    internal class Tools : NewBaseType
     {
    
     public static int SumInt(string val)
@@ -29,8 +57,7 @@ namespace   MyApp // Note: actual namespace depends on the project name.
         return number1;
     }
 
-
-    public static decimal SumDecimal(string val)
+        public static decimal SumDecimal(string val)
     {
         decimal number1 = 0;
     

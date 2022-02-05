@@ -16,7 +16,7 @@ using System.Collections;
 // See https://aka.ms/new-console-template for more information
 namespace   MyApp // Note: actual namespace depends on the project name.
 {
-    internal class Zakazenia
+    internal class Postep_Zakazen
     {
   
 
@@ -35,7 +35,11 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             // remove "
             for(int j = 0; j < ds_raw_lines.Length; j++ ) {
 
-                if( (j < 2) || (j == ds_raw_lines.Length - 1) ) {
+                // test number of columns
+                if( (j < 2) || 
+                    (j == ds_raw_lines.Length - 1) ||
+                    (j == ds_raw_lines.Length / 2)
+                ) {
                     Console.WriteLine("columns {0} {1}", j, ds_raw_lines[j].Split(';').Length );
                 }
 
@@ -56,9 +60,9 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             // 2. Query creation.            
             // data source with picked columns
             var ds_picked_cols =                     // it is an IEnumerable<...>
-                  from line in ds_raw_lines.Skip(1) // .Take(100)   // skip header
+                  from line in ds_raw_lines.Skip(1) // .Take(111100)   // skip header
                   let x = line.Split(';')
-                  where Convert.ToDateTime(x[0]).Year == 2022
+              //   where Convert.ToDateTime(x[0]).Year == 2022
                   select (                           // AnonymousType
                        new { data_rap_zakazenia = x[0], 
                              wiek           = x[4],
@@ -67,20 +71,25 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                              liczba_zakazonych = x[9],
                              data           = Convert.ToDateTime(x[0]),
                              dawka_ost      = x[7],
-                             rok            = Convert.ToDateTime(x[0]).Year
+                             rok            = Convert.ToDateTime(x[0]).Year,
+                             szczepiony     = Tools.Jabbed( x[6], x[7] )
                             } 
                         );
             
             var sum2 = ds_picked_cols.Sum(x => Tools.SumInt( x.liczba_zakazonych ));    // decimal (money)
+            var sum_jabbed2 = ds_picked_cols.Where(x => x.szczepiony ).Sum(x => Tools.SumInt( x.liczba_zakazonych ));   
+            var sum_normal2 = ds_picked_cols.Where(x => !x.szczepiony ).Sum(x => Tools.SumInt( x.liczba_zakazonych ));   
+
+            Console.WriteLine( $"{sum2} = jabbed {sum_jabbed2} + normal {sum_normal2} = {sum_jabbed2 + sum_normal2}" );
 
             // grouped data source
             var ds_grouped = (                                       //  Since C# 7 you can also use value tuples:   
                   from rec in ds_picked_cols                         //  group x by (x.Column1, x.Column2)   
-                 group rec by new { rec.producent, rec.dawka_ost, rec.rok }   // .GroupBy(x => (x.Column1, x.Column2))
+                 group rec by rec.data  // .GroupBy(x => (x.Column1, x.Column2))
                   into newGroup
             // orderby newGroup.Key
                 select new {                // AnonymousType
-                    producent = newGroup.Key.producent,
+                    data     = newGroup.Key,
                     ile      = newGroup.Sum(     x => Tools.SumInt( x.liczba_zakazonych )),
                     min_wiek = newGroup.Min(     x => Tools.SumDecimal( x.wiek )),
                     avg_wiek = newGroup.Average( x => Tools.SumDecimal( x.wiek )),
@@ -88,34 +97,49 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     min_kat_wiek = newGroup.Min( x => x.kat_wiek ),
                     max_kat_wiek = newGroup.Max( x => x.kat_wiek ),
                     cnt      = newGroup.Count(),
-                    min_data = newGroup.Min(     x => x.data_rap_zakazenia ),
-                    max_data = newGroup.Max(     x => x.data_rap_zakazenia ),
-                    min_dt   = newGroup.Min(     x => x.data ),
-                    max_dt   = newGroup.Max(     x => x.data ),
-                    dawka_ost = newGroup.Key.dawka_ost,
-                    rok       = newGroup.Key.rok
+                    // min_data = newGroup.Min(     x => x.data_rap_zakazenia ),
+                    // max_data = newGroup.Max(     x => x.data_rap_zakazenia ),
+                    // min_dt   = newGroup.Min(     x => x.data ),
+                    // max_dt   = newGroup.Max(     x => x.data ),
+                    dawka_ost = String.Concat( newGroup.Min( x => x.dawka_ost ), "..", newGroup.Max( x => x.dawka_ost )),
+                    rok       = String.Concat( newGroup.Min( x => x.rok ),       "..", newGroup.Max( x => x.rok )),
+                    jabbed_cnt = newGroup.Sum( x => ( x.szczepiony ? Tools.SumInt( x.liczba_zakazonych) : 0 )),
+                    normal_cnt = newGroup.Sum( x => (!x.szczepiony ? Tools.SumInt( x.liczba_zakazonych) : 0 )),
+                    producent  = String.Concat( newGroup.Min( x => x.producent ), "..", newGroup.Max( x => x.producent ))
                 }
-            ).OrderByDescending( obj => obj.rok ).ThenByDescending( obj => obj.ile );
+            ).OrderBy( obj => obj.data );
 
             var sum3 = ds_grouped.Sum(x => x.ile );    // decimal (money)
+            var sum_jabbed3 = ds_picked_cols.Where(x => x.szczepiony ).Sum(x => Tools.SumInt( x.liczba_zakazonych ));   
+            var sum_normal3 = ds_picked_cols.Where(x => !x.szczepiony ).Sum(x => Tools.SumInt( x.liczba_zakazonych ));   
+
+            Console.WriteLine( $"{sum3} = jabbed {sum_jabbed3} + normal {sum_normal3} = {sum_jabbed2 + sum_normal3}" );
 
             // compose header
             string head = @" 
-                    producent       ,
+                    data_rap        ,
                     ile             ,
                     min_wiek        ,
                     avg_wiek        ,
                     max_wiek        ,
                     min_kat_wiek    ,
                     max_kat_wiek    ,    
-                    cnt             ,    
-                    min_data        ,
-                    max_data        ,
-                    min_dt          ,
-                    max_dt          ,
+                    cnt             ,                          
                     dawka_ost       ,
                     rok             ,
-                    procent         ".Replace(System.Environment.NewLine, "");
+                    jabbed_cnt      ,
+                    normal_cnt      ,
+                    producent       ,
+                    procent_jabbed  ,
+                    procent_normal   ,
+                    total".Replace(System.Environment.NewLine, "");
+
+                    /*
+                    // min_data        ,
+                    // max_data        ,
+                    // min_dt          ,
+                    // max_dt          ,
+                    */
                     
             head = head.Replace(" ", "");
             Console.WriteLine( head );
@@ -126,8 +150,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             int i = 0;
             foreach (var n in ds_grouped)
             {
-                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}",
-                    n.producent       ,
+                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}",
+                    n.data            ,
                     n.ile             ,
                     n.min_wiek        ,
                     n.avg_wiek        ,
@@ -135,13 +159,19 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     n.min_kat_wiek    ,
                     n.max_kat_wiek    ,    
                     n.cnt             ,    
-                    n.min_data        ,
-                    n.max_data        ,
-                    n.min_dt          ,
-                    n.max_dt          ,
+                    // n.min_data        ,
+                    // n.max_data        ,
+                    // n.min_dt          ,
+                    // n.max_dt          ,
                     n.dawka_ost       ,
                     n.rok             ,
-                    sum2 > 0 ? (100.0 * n.ile / sum2) : null
+                    n.jabbed_cnt      ,
+                    n.normal_cnt      ,
+                    n.producent       ,
+                    n.ile > 0 ? (100.0 * n.jabbed_cnt / n.ile) : null,
+                    n.ile > 0 ? (100.0 * n.normal_cnt / n.ile) : null,
+                    n.jabbed_cnt + n.normal_cnt,
+                    null,null,null,null
                 ) + System.Environment.NewLine;
 
                 // show some top lines in the console
@@ -158,8 +188,6 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             Console.WriteLine( $"output written to: {outFileName}" );
 
         }
-
-
 
 
     }

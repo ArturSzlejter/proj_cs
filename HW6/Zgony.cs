@@ -20,7 +20,7 @@ namespace   MyApp // Note: actual namespace depends on the project name.
     internal class Zgony
     {
    
-        public static void use_LINQ_with_CSV_zgony( string inFileName, string outFileName )
+        public static void use_LINQ_with_CSV( string inFileName, string outFileName )
         {        
             Console.WriteLine(File.Exists(inFileName)
                     ? $"File exists: {inFileName}"
@@ -78,9 +78,13 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                              kat_wiek       = x[5],
                              producent      = x[7],
                              liczba_zgonow  = x[10],
-                             data           = Convert.ToDateTime(x[0])
+                             data           = Convert.ToDateTime(x[0]),
+                             dawka_ost      = x[8],
+                             rok            = Convert.ToDateTime(x[0]).Year
                             } 
                         );
+
+            var sum2 = ds_picked_cols.Sum(x => Tools.SumInt( x.liczba_zgonow ));    // decimal (money)
 
             // grouped data source
             var ds_grouped = (
@@ -100,9 +104,13 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     min_data = newGroup.Min(     x => x.data_rap_zgonu ),
                     max_data = newGroup.Max(     x => x.data_rap_zgonu ),
                     min_dt   = newGroup.Min(     x => x.data ),
-                    max_dt   = newGroup.Max(     x => x.data )
+                    max_dt   = newGroup.Max(     x => x.data ),
+                    dawka_ost = String.Concat( newGroup.Min( x => x.dawka_ost ), "..", newGroup.Max( x => x.dawka_ost )),
+                    rok       = String.Concat( newGroup.Min( x => x.rok ),       "..", newGroup.Max( x => x.rok ))
                 }
             ).OrderByDescending(obj => obj.ile);
+
+            var sum3 = ds_grouped.Sum(x => x.ile );    // decimal (money)
 
             // compose header
             string head = @" 
@@ -117,7 +125,11 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     min_data        ,
                     max_data        ,
                     min_dt          ,
-                    max_dt          ".Replace(System.Environment.NewLine, "");
+                    max_dt          ,
+                    dawka_ost       ,
+                    rok             ,
+                    procent         ".Replace(System.Environment.NewLine, "");
+
                     
             head = head.Replace(" ", "");
             Console.WriteLine( head );
@@ -128,7 +140,7 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             int i = 0;
             foreach (var n in ds_grouped)
             {
-                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}",
+                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}",
                     n.producent       ,
                     n.ile             ,
                     n.min_wiek        ,
@@ -140,7 +152,10 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     n.min_data        ,
                     n.max_data        ,
                     n.min_dt          ,
-                    n.max_dt               
+                    n.max_dt          ,
+                    n.dawka_ost       ,
+                    n.rok             ,
+                    sum2 > 0 ? (100.0 * n.ile / sum2) : null
                 ) + System.Environment.NewLine;
 
                 // show some top lines in the console
@@ -151,6 +166,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                 File.AppendAllText( outFileName, s);   // , Encoding.UTF8
 
             }
+
+            Console.WriteLine( $"{sum2} sum test {sum3}" );
 
             Console.WriteLine( $"output written to: {outFileName}" );
 
