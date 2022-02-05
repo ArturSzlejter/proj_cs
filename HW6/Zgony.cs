@@ -20,27 +20,6 @@ namespace   MyApp // Note: actual namespace depends on the project name.
     internal class Zgony
     {
    
-    public static int SumInt(string val)
-    {
-        int number1 = 0;
-    
-        bool canConvert = Int32.TryParse(val, out number1);
-
-        return number1;
-    }
-
-
-    public static decimal SumDecimal(string val)
-    {
-        decimal number1 = 0;
-    
-        bool canConvert = decimal.TryParse(val, out number1);
-
-        // Console.WriteLine( $"{val} {number1}" );
-
-        return number1;
-    }
-
         public static void use_LINQ_with_CSV_zgony( string inFileName, string outFileName )
         {        
             Console.WriteLine(File.Exists(inFileName)
@@ -51,8 +30,14 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             // 1. Data source.
             string[] ds_raw_lines = System.IO.File.ReadAllLines(inFileName);  
 
+            Console.WriteLine("lines {0}", ds_raw_lines.Length );
+
             // remove "
             for(int j = 0; j < ds_raw_lines.Length; j++ ) {
+
+                if( (j < 2) || (j == ds_raw_lines.Length - 1) ) {
+                    Console.WriteLine("columns {0} {1}", j, ds_raw_lines[j].Split(';').Length );
+                }
 
                 // A verbatim string, embedded " must be escaped as ""
                 ds_raw_lines[j] = ds_raw_lines[j].Replace( @"""", "" ); 
@@ -105,10 +90,10 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             // orderby newGroup.Key
                 select new {                // AnonymousType
                     producent = newGroup.Key,                    
-                    ile      = newGroup.Sum(     x => SumInt( x.liczba_zgonow )),
-                    min_wiek = newGroup.Min(     x => SumDecimal( x.wiek )),
-                    avg_wiek = newGroup.Average( x => SumDecimal( x.wiek )),
-                    max_wiek = newGroup.Max(     x => SumDecimal( x.wiek )),
+                    ile      = newGroup.Sum(     x => Tools.SumInt( x.liczba_zgonow )),
+                    min_wiek = newGroup.Min(     x => Tools.SumDecimal( x.wiek )),
+                    avg_wiek = newGroup.Average( x => Tools.SumDecimal( x.wiek )),
+                    max_wiek = newGroup.Max(     x => Tools.SumDecimal( x.wiek )),
                     min_kat_wiek = newGroup.Min( x => x.kat_wiek ),
                     max_kat_wiek = newGroup.Max( x => x.kat_wiek ),
                     cnt      = newGroup.Count(),
@@ -170,28 +155,6 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             Console.WriteLine( $"output written to: {outFileName}" );
 
         }
-
-
-public static void ListArrayListMembers(ArrayList list)
-{
-    foreach (Object obj in list)
-    {
-        Type type = obj.GetType();
-        Console.WriteLine("{0} -- ", type.Name);
-        Console.WriteLine(" Properties: ");
-        foreach (var prop in type.GetProperties())  // PropertyInfo
-        {
-            Console.WriteLine("\t{0} {1} = {2}", prop.PropertyType.Name, 
-                prop.Name, prop.GetValue(obj, null));
-        }
-        Console.WriteLine(" Fields: ");
-        foreach (var field in type.GetFields())     // FieldInfo
-        {
-            Console.WriteLine("\t{0} {1} = {2}", field.FieldType.Name, 
-                field.Name, field.GetValue(obj));
-        }
-    }
-}
 
 
     }

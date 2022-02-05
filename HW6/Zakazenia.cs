@@ -1,7 +1,6 @@
 ﻿//
 // https://basiw.mz.gov.pl/index.html#/visualization?id=3761
-// https://dane.gov.pl/pl/dataset/2582,statystyki-zakazen-i-zgonow-z-powodu-covid-19-z-uw
-//
+// https://dane.gov.pl/pl/dataset/2582,statystyki-zakazen-i-zgonow-z-powodu-covid-19-z-uw?page=1&per_page=50&q=&sort=-data_date
 
 
 using System;
@@ -19,28 +18,7 @@ namespace   MyApp // Note: actual namespace depends on the project name.
 {
     internal class Zakazenia
     {
-
-   
-    public static int SumInt(string val)
-    {
-        int number1 = 0;
-    
-        bool canConvert = Int32.TryParse(val, out number1);
-
-        return number1;
-    }
-
-
-    public static decimal SumDecimal(string val)
-    {
-        decimal number1 = 0;
-    
-        bool canConvert = decimal.TryParse(val, out number1);
-
-        // Console.WriteLine( $"{val} {number1}" );
-
-        return number1;
-    }
+  
 
         public static void use_LINQ_with_CSV_zakazenia( string inFileName, string outFileName )
         {        
@@ -52,35 +30,27 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             // 1. Data source.
             string[] ds_raw_lines = System.IO.File.ReadAllLines(inFileName);  
 
+            Console.WriteLine("lines {0}", ds_raw_lines.Length );
+
             // remove "
             for(int j = 0; j < ds_raw_lines.Length; j++ ) {
+
+                if( (j < 2) || (j == ds_raw_lines.Length - 1) ) {
+                    Console.WriteLine("columns {0} {1}", j, ds_raw_lines[j].Split(';').Length );
+                }
 
                 // A verbatim string, embedded " must be escaped as ""
                 ds_raw_lines[j] = ds_raw_lines[j].Replace( @"""", "" ); 
 
             }
 
-    /*  SQL query for ADO
-
-      strSQL = "Select zgony.[producent]," & _
-            "   Sum( zgony.[liczba_zaraportowanych_zgonow] ) As ile, " & _
-            "   Min( zgony.[wiek] ) as min_wiek," & _
-            "   Avg( zgony.[wiek] ) as avg_wiek," & _
-            "   Max( zgony.[wiek] ) as max_wiek," & _
-            "   Min( zgony.[kat_wiek] ) as min_kat_wiek," & _
-            "   Max( zgony.[kat_wiek] ) as max_kat_wiek," & _
-            " Count( zgony.[liczba_zaraportowanych_zgonow] ) As cnt, " & _
-            "   Min( zgony.[data_rap_zgonu] ) as min_data," & _
-            "   Max( zgony.[data_rap_zgonu] ) as max_data " & _
-             "  From [zgony_po_szczep$] zgony " & _
-          " Group By zgony.[producent] " & _
-             " Order By 2 Desc, 3 Desc"
-    */
     
             // Create the query.
             // HEADER:
-            //  0                   1           2           3   4       5           6                   7              8          9                         10  
-            // "data_rap_zgonu";"teryt_woj";"teryt_pow";"plec";"wiek";"kat_wiek";"czy_wspolistniejace";"producent";"dawka_ost";"obniz_odpornosc";"liczba_zaraportowanych_zgonow"
+            //           0                   1           2           3        4       5           6                   7          8          9                         10            
+            // zgony "data_rap_zgonu";    "teryt_woj";"teryt_pow";"plec";"wiek";"kat_wiek";"czy_wspolistniejace";"producent";"dawka_ost";"obniz_odpornosc";"liczba_zaraportowanych_zgonow"
+            // zakaz "data_rap_zakazenia";"teryt_woj";"teryt_pow";"plec";"wiek";"kat_wiek";                      "producent";"dawka_ost";"obniz_odpornosc";"liczba_zaraportowanych_zakazonych"
+            //           0                   1           2           3        4       5                                6         7          8                          9 
   
             // IEnumerable<<string>,<string>,<string>,<string>,...>            
             // 2. Query creation.            
@@ -88,37 +58,42 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             var ds_picked_cols =                     // it is an IEnumerable<...>
                   from line in ds_raw_lines.Skip(1)  // skip header
                   let x = line.Split(';')
+                  where Convert.ToDateTime(x[0]).Year == 2022
                   select (                           // AnonymousType
-                       new { data_rap_zgonu = x[0], 
+                       new { data_rap_zakazenia = x[0], 
                              wiek           = x[4],
                              kat_wiek       = x[5],
-                             producent      = x[7],
-                             liczba_zgonow  = x[10],
-                             data           = Convert.ToDateTime(x[0])
+                             producent      = x[6],
+                             liczba_zakazonych = x[9],
+                             data           = Convert.ToDateTime(x[0]),
+                             dawka_ost      = x[7],
+                             rok            = Convert.ToDateTime(x[0]).Year
                             } 
                         );
 
             // grouped data source
-            var ds_grouped = (
-                  from rec in ds_picked_cols
-                 group rec by rec.producent 
+            var ds_grouped = (                                       //  Since C# 7 you can also use value tuples:   
+                  from rec in ds_picked_cols                         //  group x by (x.Column1, x.Column2)   
+                 group rec by new { rec.producent, rec.dawka_ost, rec.rok }   // .GroupBy(x => (x.Column1, x.Column2))
                   into newGroup
             // orderby newGroup.Key
                 select new {                // AnonymousType
-                    producent = newGroup.Key,                    
-                    ile      = newGroup.Sum(     x => SumInt( x.liczba_zgonow )),
-                    min_wiek = newGroup.Min(     x => SumDecimal( x.wiek )),
-                    avg_wiek = newGroup.Average( x => SumDecimal( x.wiek )),
-                    max_wiek = newGroup.Max(     x => SumDecimal( x.wiek )),
+                    producent = newGroup.Key.producent,
+                    ile      = newGroup.Sum(     x => Tools.SumInt( x.liczba_zakazonych )),
+                    min_wiek = newGroup.Min(     x => Tools.SumDecimal( x.wiek )),
+                    avg_wiek = newGroup.Average( x => Tools.SumDecimal( x.wiek )),
+                    max_wiek = newGroup.Max(     x => Tools.SumDecimal( x.wiek )),
                     min_kat_wiek = newGroup.Min( x => x.kat_wiek ),
                     max_kat_wiek = newGroup.Max( x => x.kat_wiek ),
                     cnt      = newGroup.Count(),
-                    min_data = newGroup.Min(     x => x.data_rap_zgonu ),
-                    max_data = newGroup.Max(     x => x.data_rap_zgonu ),
+                    min_data = newGroup.Min(     x => x.data_rap_zakazenia ),
+                    max_data = newGroup.Max(     x => x.data_rap_zakazenia ),
                     min_dt   = newGroup.Min(     x => x.data ),
-                    max_dt   = newGroup.Max(     x => x.data )
+                    max_dt   = newGroup.Max(     x => x.data ),
+                    dawka_ost = newGroup.Key.dawka_ost,
+                    rok = newGroup.Key.rok
                 }
-            ).OrderByDescending(obj => obj.ile);
+            ).OrderByDescending( obj => obj.rok ).ThenByDescending( obj => obj.ile );
 
             // compose header
             string head = @" 
@@ -133,7 +108,9 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     min_data        ,
                     max_data        ,
                     min_dt          ,
-                    max_dt          ".Replace(System.Environment.NewLine, "");
+                    max_dt          ,
+                    dawka_ost       ,
+                    rok             ".Replace(System.Environment.NewLine, "");
                     
             head = head.Replace(" ", "");
             Console.WriteLine( head );
@@ -144,7 +121,7 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             int i = 0;
             foreach (var n in ds_grouped)
             {
-                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}",
+                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}",
                     n.producent       ,
                     n.ile             ,
                     n.min_wiek        ,
@@ -156,7 +133,9 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     n.min_data        ,
                     n.max_data        ,
                     n.min_dt          ,
-                    n.max_dt               
+                    n.max_dt          ,
+                    n.dawka_ost       ,
+                    n.rok
                 ) + System.Environment.NewLine;
 
                 // show some top lines in the console
@@ -173,26 +152,6 @@ namespace   MyApp // Note: actual namespace depends on the project name.
         }
 
 
-public static void ListArrayListMembers(ArrayList list)
-{
-    foreach (Object obj in list)
-    {
-        Type type = obj.GetType();
-        Console.WriteLine("{0} -- ", type.Name);
-        Console.WriteLine(" Properties: ");
-        foreach (var prop in type.GetProperties())  // PropertyInfo
-        {
-            Console.WriteLine("\t{0} {1} = {2}", prop.PropertyType.Name, 
-                prop.Name, prop.GetValue(obj, null));
-        }
-        Console.WriteLine(" Fields: ");
-        foreach (var field in type.GetFields())     // FieldInfo
-        {
-            Console.WriteLine("\t{0} {1} = {2}", field.FieldType.Name, 
-                field.Name, field.GetValue(obj));
-        }
-    }
-}
 
 
     }
