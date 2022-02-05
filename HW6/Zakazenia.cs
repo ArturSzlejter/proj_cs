@@ -55,8 +55,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             // IEnumerable<<string>,<string>,<string>,<string>,...>            
             // 2. Query creation.            
             // data source with picked columns
-            var ds_picked_cols =                     // it is an IEnumerable<...>
-                  from line in ds_raw_lines.Skip(1)  // skip header
+            var ds_picked_cols =                    // it is an IEnumerable<...>
+                  from line in ds_raw_lines.Skip(1) // .Take(100)   // skip header
                   let x = line.Split(';')
                   where Convert.ToDateTime(x[0]).Year == 2022
                   select (                           // AnonymousType
@@ -70,6 +70,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                              rok            = Convert.ToDateTime(x[0]).Year
                             } 
                         );
+            
+            var sum2 = ds_picked_cols.Sum(x => Tools.SumInt( x.liczba_zakazonych ));    // decimal (money)
 
             // grouped data source
             var ds_grouped = (                                       //  Since C# 7 you can also use value tuples:   
@@ -95,6 +97,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                 }
             ).OrderByDescending( obj => obj.rok ).ThenByDescending( obj => obj.ile );
 
+            var sum3 = ds_grouped.Sum(x => x.ile );    // decimal (money)
+
             // compose header
             string head = @" 
                     producent       ,
@@ -110,7 +114,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     min_dt          ,
                     max_dt          ,
                     dawka_ost       ,
-                    rok             ".Replace(System.Environment.NewLine, "");
+                    rok             ,
+                    procent         ".Replace(System.Environment.NewLine, "");
                     
             head = head.Replace(" ", "");
             Console.WriteLine( head );
@@ -121,7 +126,7 @@ namespace   MyApp // Note: actual namespace depends on the project name.
             int i = 0;
             foreach (var n in ds_grouped)
             {
-                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}",
+                string  s = string.Format( "{0}, {1}, {2}, {3:f2}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}",
                     n.producent       ,
                     n.ile             ,
                     n.min_wiek        ,
@@ -135,7 +140,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                     n.min_dt          ,
                     n.max_dt          ,
                     n.dawka_ost       ,
-                    n.rok
+                    n.rok             ,
+                    sum2 > 0 ? (100.0 * n.ile / sum2) : null
                 ) + System.Environment.NewLine;
 
                 // show some top lines in the console
@@ -146,6 +152,8 @@ namespace   MyApp // Note: actual namespace depends on the project name.
                 File.AppendAllText( outFileName, s);   // , Encoding.UTF8
 
             }
+
+            Console.WriteLine( $"{sum2} sum test {sum3}" );
 
             Console.WriteLine( $"output written to: {outFileName}" );
 
